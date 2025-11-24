@@ -1,7 +1,9 @@
 package tw.edu.pu.csim.tcyang.firestore
 
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.toObject
 import kotlinx.coroutines.tasks.await
 import kotlin.text.set
 
@@ -20,6 +22,7 @@ class UserScoreRepository {
             "新增資料失敗：${e.message}"
         }
     }
+
     suspend fun updateUser(userScore: UserScoreModel): String {
         return try {
             db.collection("UserScore")
@@ -55,4 +58,55 @@ class UserScoreRepository {
             "刪除資料失敗：${e.message}"
         }
     }
+
+
+    suspend fun getUserScoreByName(userScore: UserScoreModel): String {
+        return try {
+            var userCondition = "彣媞"
+            val querySnapshot = db.collection("UserScore")
+                .whereEqualTo("user", userCondition) // 篩選條件
+                .get().await()
+            if (!querySnapshot.isEmpty) {
+                val document = querySnapshot.documents.first() // 取得第一個符合條件的文件
+                val userScore = document.toObject<UserScoreModel>()
+                "查詢成功！${userScore?.user} 的分數是 ${userScore?.score}"
+            } else {
+                "查詢失敗：找不到使用者 $userCondition 的資料。"
+            }
+        } catch (e: Exception) {
+            // await() 失敗時會拋出例外，在這裡捕捉並處理
+            "查詢資料失敗：${e.message}"
+        }
+    }
+
+    suspend fun orderByScore(): String {
+        return try {
+            var message = ""
+            val querySnapshot = db.collection("UserScore")
+                .orderBy("score", Query.Direction.DESCENDING)
+                .limit(3).get().await()
+
+            // 使用 forEach 迴圈遍歷所有文件
+            querySnapshot.documents.forEach { document ->
+                // 將文件轉換為 UserScoreModel
+                val userScore = document.toObject<UserScoreModel>()
+
+                // 檢查是否成功轉換，並將分數加入字串
+                userScore?.let {
+                    message += "使用者 ${it.user} 的分數為 ${it.score} \n"
+                }
+            }
+            if (message.isEmpty()) {
+                message = "抱歉，資料庫目前無相關資料"
+            } else {
+                message = "查詢成功！分數由大到小排序為：\n" + message
+            }
+            message
+
+        } catch (e: Exception) {
+            // await() 失敗時會拋出例外，在這裡捕捉並處理
+            "查詢資料失敗：${e.message}"
+        }
+    }
+
 }
